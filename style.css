@@ -1,0 +1,197 @@
+:root{
+  --bg:#05070a;
+  --card: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.18);
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.72);
+  --accent: #7dd3fc;
+  --shadow: 0 18px 60px rgba(0,0,0,0.45);
+  --radius: 18px;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  background: radial-gradient(900px 500px at 80% 10%, rgba(125,211,252,0.10), transparent 60%),
+              radial-gradient(700px 500px at 10% 90%, rgba(167,139,250,0.10), transparent 60%),
+              var(--bg);
+  color: var(--text);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 20px;
+  overflow:hidden;
+}
+
+.bg-canvas{
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  opacity:0.65;
+}
+
+.wrap{ width:min(860px, 100%); }
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 22px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+h1{
+  margin:0 0 12px;
+  font-size: clamp(22px, 3vw, 32px);
+  letter-spacing: 0.2px;
+}
+p{
+  margin: 10px 0;
+  font-size: clamp(16px, 2.2vw, 18px);
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+pre.riddle{
+  margin: 14px 0 10px;
+  padding: 16px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.22);
+  font-size: clamp(16px, 2.1vw, 19px);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.row{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top: 14px;
+}
+
+input.code{
+  direction:ltr;
+  font-variant-numeric: tabular-nums;
+  padding: 12px 12px;
+  font-size: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.25);
+  color: var(--text);
+  outline:none;
+  width: 220px;
+  max-width: 100%;
+}
+
+button{
+  padding: 12px 16px;
+  font-size: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  cursor:pointer;
+  transition: transform .08s ease, background .2s ease;
+}
+button:hover{ background: rgba(255,255,255,0.12); }
+button:active{ transform: translateY(1px); }
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom: 14px;
+  flex-wrap:wrap;
+}
+.pill{
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.22);
+  color: var(--muted);
+  font-size: 14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.pill strong{ color: var(--text); font-weight:600; }
+
+.small{
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* THEME: MATRIX (riddle1) */
+body.theme-matrix{
+  background: #000;
+  color: rgba(160,255,180,0.95);
+}
+body.theme-matrix .card{
+  border-color: rgba(0,255,120,0.35);
+  background: rgba(0,0,0,0.55);
+  box-shadow: 0 18px 80px rgba(0,255,120,0.08);
+}
+body.theme-matrix pre.riddle{
+  border-color: rgba(0,255,120,0.35);
+  background: rgba(0,0,0,0.65);
+  color: rgba(160,255,180,0.95);
+}
+body.theme-matrix input.code, body.theme-matrix button{
+  border-color: rgba(0,255,120,0.35);
+}
+
+/* THEME: INDIANA (riddle2) */
+body.theme-indiana{
+  background: radial-gradient(900px 500px at 20% 10%, rgba(255,200,120,0.12), transparent 60%),
+              radial-gradient(700px 500px at 80% 90%, rgba(120,70,20,0.14), transparent 60%),
+              #2a1d12;
+}
+body.theme-indiana .card{
+  background: rgba(255,235,200,0.08);
+  border-color: rgba(255,220,170,0.25);
+}
+body.theme-indiana pre.riddle{
+  background: rgba(35,22,12,0.20);
+}
+
+/* THEME: WALLACE (riddle3) */
+body.theme-wallace{
+  background: radial-gradient(900px 500px at 70% 15%, rgba(255,170,120,0.12), transparent 60%),
+              radial-gradient(700px 500px at 20% 90%, rgba(120,200,255,0.10), transparent 60%),
+              #101420;
+}
+body.theme-wallace .card{
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.16);
+}
+body.theme-wallace pre.riddle{
+  background: rgba(255,255,255,0.06);
+}
+
+/* THEME: AVATAR (riddle4) */
+body.theme-avatar{
+  background: radial-gradient(900px 500px at 70% 20%, rgba(80,200,255,0.16), transparent 60%),
+              radial-gradient(900px 600px at 10% 80%, rgba(90,255,200,0.10), transparent 60%),
+              #06121a;
+}
+body.theme-avatar .card{
+  border-color: rgba(80,200,255,0.22);
+  box-shadow: 0 18px 80px rgba(80,200,255,0.10);
+}
+body.theme-avatar pre.riddle{
+  border-color: rgba(80,200,255,0.22);
+}
+
+/* footer result */
+.result{
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.22);
+}

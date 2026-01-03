@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>חידה 4 – אווטאר</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="stylesheet" href="style.css">
+  
+</head>
+<body class="theme-avatar">
+
+<div class="wrap">
+  <div class="card">
+    <div class="topbar">
+      <div class="pill">⏱️ <strong>טיימר</strong> <span id="timer">0:00</span></div>
+      <div class="pill">⚠️ <strong>קנסות</strong> <span id="penalty">0s</span></div>
+      <div class="pill">❌ <strong>טעויות</strong> <span id="wrongs">0</span></div>
+    </div>
+
+    <h1>מסר כחול // עולם חדש</h1>
+
+    <pre class="riddle">
+כשעוברים למקום חדש, לא מביאים הכול מהעבר.
+משהו אחד גדול הגיע במיוחד.
+
+דלת שומרת סודות נמוכה ושקטה.
+כדי לפתוח אותה צריך להתכופף.
+    </pre>
+
+    <div class="result" id="finalScore">מסכם תוצאה…</div>
+
+    <div class="row">
+      <button onclick="playIntroSound()">🔊 צליל</button>
+      <button onclick="resetGame()">איפוס משחק</button>
+    </div>
+
+    <p class="small" style="margin-top:10px;">
+      (איפוס מיועד רק אם רוצים להריץ שוב מהתחלה.)
+    </p>
+  </div>
+</div>
+
+<script>
+  startTimerIfNeeded();
+  renderFinish();
+</script>
+
+<script src="script.js"></script>
+
+</body>
+</html>
