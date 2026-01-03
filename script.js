@@ -1,40 +1,72 @@
 /**
- * Escape-room logic:
- * - Timer starts ONLY on the first code attempt (first click on "בדיקה/אישור").
- * - Wrong format (not 6 digits): +5s penalty
- * - Wrong code: +10s penalty + sad sound
- * - Correct code: success sound + next page
- * - HUD (timer/penalty/wrongs) updates on every page.
+ * v3 fixes:
+ * - Cache busting handled in HTML (?v=3)
+ * - Robust storage wrapper (localStorage -> sessionStorage -> in-memory)
+ * - HUD auto-inits on DOMContentLoaded if not explicitly called
+ * - HUD updates immediately after each attempt
+ * - Timer starts on first code attempt
  */
 
-const GAME_KEY = "neilMission_v2";
+const GAME_KEY = "neilMission_v3";
+
+const Store = (() => {
+  let mem = {};
+  function canUse(storage){
+    try{
+      const k="__t"; storage.setItem(k,"1"); storage.removeItem(k); return true;
+    }catch(e){ return false; }
+  }
+  const hasLocal = canUse(window.localStorage);
+  const hasSession = canUse(window.sessionStorage);
+
+  function getRaw(){
+    if (hasLocal) return localStorage.getItem(GAME_KEY);
+    if (hasSession) return sessionStorage.getItem(GAME_KEY);
+    return mem[GAME_KEY] || null;
+  }
+  function setRaw(v){
+    if (hasLocal) return localStorage.setItem(GAME_KEY, v);
+    if (hasSession) return sessionStorage.setItem(GAME_KEY, v);
+    mem[GAME_KEY] = v;
+  }
+  function del(){
+    if (hasLocal) localStorage.removeItem(GAME_KEY);
+    if (hasSession) sessionStorage.removeItem(GAME_KEY);
+    delete mem[GAME_KEY];
+  }
+  return { getRaw, setRaw, del, hasLocal, hasSession };
+})();
 
 function nowMs(){ return Date.now(); }
 
 function loadState(){
-  try { return JSON.parse(localStorage.getItem(GAME_KEY) || "{}"); }
+  try { return JSON.parse(Store.getRaw() || "{}"); }
   catch { return {}; }
 }
 function saveState(s){
-  localStorage.setItem(GAME_KEY, JSON.stringify(s));
+  Store.setRaw(JSON.stringify(s));
 }
 
-function ensureGameStarted(){
-  const s = loadState();
+function normalizeState(s){
+  if (!("penaltySec" in s)) s.penaltySec = 0;
+  if (!("wrongAttempts" in s)) s.wrongAttempts = 0;
+  return s;
+}
+
+function ensureStarted(){
+  const s = normalizeState(loadState());
   if (!s.startedAt) {
     s.startedAt = nowMs();
-    s.penaltySec = s.penaltySec || 0;
-    s.wrongAttempts = s.wrongAttempts || 0;
     saveState(s);
   }
   return s;
 }
 
-function getState(){
-  const s = loadState();
-  if (!("penaltySec" in s)) s.penaltySec = 0;
-  if (!("wrongAttempts" in s)) s.wrongAttempts = 0;
-  return s;
+function addPenalty(seconds){
+  const s = normalizeState(loadState());
+  s.penaltySec += seconds;
+  s.wrongAttempts += 1;
+  saveState(s);
 }
 
 function formatTime(totalSec){
@@ -44,43 +76,45 @@ function formatTime(totalSec){
   return `${m}:${String(s).padStart(2,'0')}`;
 }
 
+function computeTotalSec(s){
+  let elapsed = 0;
+  if (s.startedAt) elapsed = (nowMs() - s.startedAt) / 1000;
+  return elapsed + (s.penaltySec || 0);
+}
+
 function updateHUD(){
-  const s = getState();
+  const s = normalizeState(loadState());
 
   const tEl = document.getElementById("timer");
   const pEl = document.getElementById("penalty");
   const wEl = document.getElementById("wrongs");
 
-  let elapsedSec = 0;
-  if (s.startedAt) elapsedSec = (nowMs() - s.startedAt) / 1000;
-
-  const totalSec = elapsedSec + (s.penaltySec || 0);
+  const totalSec = computeTotalSec(s);
 
   if (tEl) tEl.textContent = formatTime(totalSec);
   if (pEl) pEl.textContent = `${s.penaltySec || 0}s`;
   if (wEl) wEl.textContent = String(s.wrongAttempts || 0);
+
+  // Optional debug (hidden unless element exists)
+  const dEl = document.getElementById("debugStore");
+  if (dEl){
+    dEl.textContent = `storage: ${Store.hasLocal ? "local" : (Store.hasSession ? "session" : "memory")}`;
+  }
 }
 
+let hudIntervalId = null;
 function initHUD(){
   updateHUD();
-  setInterval(updateHUD, 250);
+  if (hudIntervalId) return;
+  hudIntervalId = setInterval(updateHUD, 250);
 }
 
-function addPenalty(seconds){
-  const s = getState();
-  s.penaltySec = (s.penaltySec || 0) + seconds;
-  s.wrongAttempts = (s.wrongAttempts || 0) + 1;
-  saveState(s);
-}
-
-/** AUDIO (no external files) */
+/** AUDIO */
 let audioCtx;
-
 function getAudioCtx(){
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
-
 function tone(at, freq, dur, type='sine', gain=0.05){
   const ctx = getAudioCtx();
   const o = ctx.createOscillator();
@@ -94,7 +128,6 @@ function tone(at, freq, dur, type='sine', gain=0.05){
   o.start(at);
   o.stop(at+dur+0.02);
 }
-
 function playSuccessSound(){
   try{
     const ctx = getAudioCtx();
@@ -105,22 +138,20 @@ function playSuccessSound(){
     tone(t0+0.70, 520, 0.08, 'sine', 0.04);
     tone(t0+0.82, 660, 0.08, 'sine', 0.04);
     tone(t0+0.94, 880, 0.10, 'sine', 0.045);
-  } catch(e){}
+  }catch(e){}
 }
-
 function playSadSound(){
   try{
     const ctx = getAudioCtx();
     const t0 = ctx.currentTime;
-    // a short descending "aww" / fail vibe
     tone(t0+0.00, 440, 0.14, 'sine', 0.035);
     tone(t0+0.16, 370, 0.16, 'sine', 0.032);
     tone(t0+0.34, 310, 0.22, 'sine', 0.030);
     tone(t0+0.58, 220, 0.20, 'triangle', 0.020);
-  } catch(e){}
+  }catch(e){}
 }
 
-/** Matrix background (canvas) */
+/** Matrix background */
 function startMatrixRain(){
   const c = document.getElementById("matrixCanvas");
   if (!c) return;
@@ -141,16 +172,13 @@ function startMatrixRain(){
   function draw(){
     ctx.fillStyle = "rgba(0,0,0,0.08)";
     ctx.fillRect(0,0,w,h);
-
     ctx.font = "16px monospace";
     for (let i=0;i<cols;i++){
       const text = chars[Math.floor(Math.random()*chars.length)];
       const x = i * 18;
       const y = drops[i] * 18;
-
       ctx.fillStyle = "rgba(0,255,120,0.85)";
       ctx.fillText(text, x, y);
-
       if (y > h && Math.random() > 0.975) drops[i] = 0;
       drops[i] += 1;
     }
@@ -161,7 +189,7 @@ function startMatrixRain(){
 
 /** Finish page summary */
 function renderFinish(){
-  const s = getState();
+  const s = normalizeState(loadState());
   if (!s.startedAt) return;
 
   const elapsedSec = (nowMs() - s.startedAt) / 1000;
@@ -170,25 +198,24 @@ function renderFinish(){
   const out = document.getElementById("finalScore");
   if (out){
     out.innerHTML = `
-      <div><strong>זמן:</strong> ${formatTime(elapsedSec)}</div>
       <div><strong>קנסות:</strong> ${(s.penaltySec||0)} שניות</div>
+      <div><strong>טעויות:</strong> ${s.wrongAttempts||0}</div>
       <div><strong>תוצאה סופית:</strong> ${formatTime(totalSec)}</div>
-      <div class="small">טעויות: ${s.wrongAttempts||0}</div>
+      <div class="small">(${formatTime(elapsedSec)} זמן נטו + קנסות)</div>
     `;
   }
 }
 
-/** Reset */
 function resetGame(){
-  localStorage.removeItem(GAME_KEY);
+  Store.del();
   alert("המשימה אופסה 🙂");
   window.location.href = "index.html";
 }
 
-/** Main checker */
 function checkCode(correct, nextPage){
-  // Start timer ONLY on first attempt
-  ensureGameStarted();
+  // Start timer on first attempt
+  ensureStarted();
+  initHUD();
 
   const el = document.getElementById("code");
   const val = (el ? el.value : "").trim();
@@ -196,16 +223,24 @@ function checkCode(correct, nextPage){
   if (!/^\d{6}$/.test(val)) {
     addPenalty(5);
     playSadSound();
+    updateHUD();
     alert("הקוד שגוי נסה שנית");
     return;
   }
 
   if (val === correct){
     playSuccessSound();
+    updateHUD();
     window.location.href = nextPage;
   } else {
     addPenalty(10);
     playSadSound();
+    updateHUD();
     alert("הקוד שגוי נסה שנית");
   }
 }
+
+// Auto-init HUD on load (safe even if timer not started yet)
+document.addEventListener("DOMContentLoaded", () => {
+  initHUD();
+});
