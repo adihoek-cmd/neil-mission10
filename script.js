@@ -1,11 +1,13 @@
 /**
- * Simple "escape room" logic:
- * - Timer starts on index.html when player clicks "התחל" or enters correct SMS code.
- * - Penalty adds +10s for each wrong code attempt.
- * - Stored in localStorage to persist across pages.
+ * Escape-room logic:
+ * - Timer starts ONLY on the first code attempt (first click on "בדיקה/אישור").
+ * - Wrong format (not 6 digits): +5s penalty
+ * - Wrong code: +10s penalty + sad sound
+ * - Correct code: success sound + next page
+ * - HUD (timer/penalty/wrongs) updates on every page.
  */
 
-const GAME_KEY = "neilMission_v1";
+const GAME_KEY = "neilMission_v2";
 
 function nowMs(){ return Date.now(); }
 
@@ -17,15 +19,21 @@ function saveState(s){
   localStorage.setItem(GAME_KEY, JSON.stringify(s));
 }
 
-function ensureState(){
+function ensureGameStarted(){
   const s = loadState();
   if (!s.startedAt) {
     s.startedAt = nowMs();
-    s.penaltySec = 0;
-    s.wrongAttempts = 0;
-    s.lastPage = "index.html";
+    s.penaltySec = s.penaltySec || 0;
+    s.wrongAttempts = s.wrongAttempts || 0;
     saveState(s);
   }
+  return s;
+}
+
+function getState(){
+  const s = loadState();
+  if (!("penaltySec" in s)) s.penaltySec = 0;
+  if (!("wrongAttempts" in s)) s.wrongAttempts = 0;
   return s;
 }
 
@@ -36,93 +44,80 @@ function formatTime(totalSec){
   return `${m}:${String(s).padStart(2,'0')}`;
 }
 
-function updateTimerUI(){
-  const s = loadState();
-  if (!s.startedAt) return;
-  const elapsedSec = (nowMs() - s.startedAt) / 1000;
+function updateHUD(){
+  const s = getState();
+
+  const tEl = document.getElementById("timer");
+  const pEl = document.getElementById("penalty");
+  const wEl = document.getElementById("wrongs");
+
+  let elapsedSec = 0;
+  if (s.startedAt) elapsedSec = (nowMs() - s.startedAt) / 1000;
+
   const totalSec = elapsedSec + (s.penaltySec || 0);
-  const t = document.getElementById("timer");
-  const p = document.getElementById("penalty");
-  const w = document.getElementById("wrongs");
-  if (t) t.textContent = formatTime(totalSec);
-  if (p) p.textContent = `${s.penaltySec || 0}s`;
-  if (w) w.textContent = String(s.wrongAttempts || 0);
+
+  if (tEl) tEl.textContent = formatTime(totalSec);
+  if (pEl) pEl.textContent = `${s.penaltySec || 0}s`;
+  if (wEl) wEl.textContent = String(s.wrongAttempts || 0);
 }
 
-function startTimerIfNeeded(){
-  ensureState();
-  updateTimerUI();
-  setInterval(updateTimerUI, 250);
+function initHUD(){
+  updateHUD();
+  setInterval(updateHUD, 250);
 }
 
 function addPenalty(seconds){
-  const s = ensureState();
+  const s = getState();
   s.penaltySec = (s.penaltySec || 0) + seconds;
   s.wrongAttempts = (s.wrongAttempts || 0) + 1;
   saveState(s);
 }
 
-function setLastPage(name){
-  const s = ensureState();
-  s.lastPage = name;
-  saveState(s);
-}
-
-/** Code checking */
-function checkCode(correct, nextPage){
-  const el = document.getElementById("code");
-  const val = (el ? el.value : "").trim();
-
-  // enforce 6 digits
-  if (!/^\d{6}$/.test(val)) {
-    addPenalty(5);
-    alert("הקוד שגוי נסה שנית");
-    return;
-  }
-
-  if (val === correct){
-    setLastPage(nextPage);
-    window.location.href = nextPage;
-  } else {
-    addPenalty(10);
-    alert("הקוד שגוי נסה שנית");
-  }
-}
-
-/** Intro sound (no external files): small sci‑fi sequence */
+/** AUDIO (no external files) */
 let audioCtx;
-function playIntroSound(){
+
+function getAudioCtx(){
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function tone(at, freq, dur, type='sine', gain=0.05){
+  const ctx = getAudioCtx();
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, at);
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(gain, at+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, at+dur);
+  o.connect(g).connect(ctx.destination);
+  o.start(at);
+  o.stop(at+dur+0.02);
+}
+
+function playSuccessSound(){
   try{
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const t0 = audioCtx.currentTime;
+    const ctx = getAudioCtx();
+    const t0 = ctx.currentTime;
+    tone(t0+0.00, 110, 0.18, 'triangle', 0.06);
+    tone(t0+0.22, 140, 0.16, 'triangle', 0.05);
+    tone(t0+0.42, 180, 0.14, 'triangle', 0.05);
+    tone(t0+0.70, 520, 0.08, 'sine', 0.04);
+    tone(t0+0.82, 660, 0.08, 'sine', 0.04);
+    tone(t0+0.94, 880, 0.10, 'sine', 0.045);
+  } catch(e){}
+}
 
-    function beep(at, freq, dur, type='sine', gain=0.05){
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = type;
-      o.frequency.setValueAtTime(freq, at);
-      g.gain.setValueAtTime(0.0001, at);
-      g.gain.exponentialRampToValueAtTime(gain, at+0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, at+dur);
-      o.connect(g).connect(audioCtx.destination);
-      o.start(at);
-      o.stop(at+dur+0.02);
-    }
-
-    // little "XPENG lab" vibe: low thumps + rising chirps
-    beep(t0+0.00, 110, 0.20, 'triangle', 0.06);
-    beep(t0+0.25, 130, 0.18, 'triangle', 0.05);
-    beep(t0+0.48, 165, 0.16, 'triangle', 0.05);
-
-    beep(t0+0.80, 520, 0.08, 'sine', 0.04);
-    beep(t0+0.92, 660, 0.08, 'sine', 0.04);
-    beep(t0+1.04, 880, 0.10, 'sine', 0.045);
-
-    beep(t0+1.25, 740, 0.12, 'square', 0.02);
-    beep(t0+1.40, 988, 0.12, 'square', 0.02);
-  } catch(e){
-    // if audio blocked, do nothing
-  }
+function playSadSound(){
+  try{
+    const ctx = getAudioCtx();
+    const t0 = ctx.currentTime;
+    // a short descending "aww" / fail vibe
+    tone(t0+0.00, 440, 0.14, 'sine', 0.035);
+    tone(t0+0.16, 370, 0.16, 'sine', 0.032);
+    tone(t0+0.34, 310, 0.22, 'sine', 0.030);
+    tone(t0+0.58, 220, 0.20, 'triangle', 0.020);
+  } catch(e){}
 }
 
 /** Matrix background (canvas) */
@@ -166,7 +161,7 @@ function startMatrixRain(){
 
 /** Finish page summary */
 function renderFinish(){
-  const s = loadState();
+  const s = getState();
   if (!s.startedAt) return;
 
   const elapsedSec = (nowMs() - s.startedAt) / 1000;
@@ -183,9 +178,34 @@ function renderFinish(){
   }
 }
 
-/** Utility: reset game (hidden) */
+/** Reset */
 function resetGame(){
   localStorage.removeItem(GAME_KEY);
-  alert("אופס… המערכת אופסה 🙂");
+  alert("המשימה אופסה 🙂");
   window.location.href = "index.html";
+}
+
+/** Main checker */
+function checkCode(correct, nextPage){
+  // Start timer ONLY on first attempt
+  ensureGameStarted();
+
+  const el = document.getElementById("code");
+  const val = (el ? el.value : "").trim();
+
+  if (!/^\d{6}$/.test(val)) {
+    addPenalty(5);
+    playSadSound();
+    alert("הקוד שגוי נסה שנית");
+    return;
+  }
+
+  if (val === correct){
+    playSuccessSound();
+    window.location.href = nextPage;
+  } else {
+    addPenalty(10);
+    playSadSound();
+    alert("הקוד שגוי נסה שנית");
+  }
 }
